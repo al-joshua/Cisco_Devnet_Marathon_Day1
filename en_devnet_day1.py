@@ -98,8 +98,8 @@ def ntp(session):
     if 'Success rate is 0 percent' in ntp_ping_response:
         ntp_sync_status = False
     else:
-        #session.send_config_set(clock_commands)
-        #time.sleep(5)
+        session.send_config_set(clock_commands)
+        time.sleep(5)
         ntp_status_result = session.send_command('sh ntp status | in Clock is')
         if 'synchronized' not in ntp_status_result:
             ntp_sync_status = False
