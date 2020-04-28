@@ -1,10 +1,11 @@
 from netmiko import ConnectHandler
+from netmiko import ssh_exception
 from datetime import date
 import getpass
 import os
 import sys
 import time
-
+import re
 
 # директория для сбора конфигураций
 output_directory = "_output"
@@ -31,7 +32,8 @@ def connect_to_device(ip, usr, passwd, enable_pass, proto='cisco_ios_telnet'):
 
     try:
         conn = ConnectHandler(**device_params)
-    except (TimeoutError, ConnectionRefusedError, ConnectionResetError, ValueError) as err:
+    except (TimeoutError, ConnectionRefusedError, ConnectionResetError, ValueError,
+            ssh_exception.NetmikoAuthenticationException) as err:
         print(err)
         conn = None
 
@@ -76,7 +78,7 @@ def image(session):
 
     image_type = 'PE'
     device_type = session.send_command('sh version | in bytes of memory').split()[1]
-    device_image = session.send_command('sh version | in System image').split()[-1].strip('"').strip('flash:')
+    device_image = re.search('[\w.-]+bin', session.send_command('sh version | in System image').split()[-1]).group()
 
     if 'npe' in device_image:
         image_type = 'NPE'
@@ -94,8 +96,8 @@ def ntp(session):
     if 'Success rate is 0 percent' in ntp_ping_response:
         ntp_sync_status = False
     else:
-        session.send_config_set(clock_commands)
-        time.sleep(5)
+        #session.send_config_set(clock_commands)
+        #time.sleep(5)
         ntp_status_result = session.send_command('sh ntp status | in Clock is')
         if 'synchronized' not in ntp_status_result:
             ntp_sync_status = False
