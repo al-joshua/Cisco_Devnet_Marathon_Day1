@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from netmiko import ConnectHandler
 from netmiko import ssh_exception
 from datetime import date
