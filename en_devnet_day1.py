@@ -84,6 +84,7 @@ def image(session):
         device_image = re.search('[\w.-]+bin', session.send_command('sh version | in System image').split()[-1]).group()
     except Exception() as err:
         print(f'failed to parse the software image name. Error {err}')
+        device_image = 'Unparsed'
 
     if 'npe' in device_image:
         image_type = 'NPE'
