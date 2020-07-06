@@ -9,18 +9,18 @@ import sys
 import time
 import re
 
-# директория для сбора конфигураций
+# folder to store configs
 output_directory = "_output"
 
-# ip адрес ntp сервера (заменить на свой)
+# ntp server ip address to configure
 ntp_server = '10.177.0.1'
 
-# команды для настройки времени и NTP
+# clock commands to configure
 clock_commands = ['clock timezone GMT 0', f'ntp server {ntp_server}']
 
 
 def connect_to_device(ip, usr, passwd, enable_pass, proto='cisco_ios_telnet'):
-    ''' Функция устанавливает телнет соединение с устройством и возвращает объект сессии '''
+    ''' function sets the connection to the devices via netmiko client '''
 
     device_params = {
         'device_type': proto,
@@ -43,7 +43,7 @@ def connect_to_device(ip, usr, passwd, enable_pass, proto='cisco_ios_telnet'):
 
 
 def sh_run(session):
-    ''' Функция сохраняет текущую конфигурацию устройства в файл а также возвращает имя хоста '''
+    ''' function polls current configurations '''
 
     hostname = session.send_command('sh run | in hostname').split()[1]
     run_config = session.send_command('sh run')
@@ -58,7 +58,7 @@ def sh_run(session):
 
 
 def cdp(session):
-    ''' Функция собирает и анализиурет вывод информации о CDP. Возвращает статус и число соседств'''
+    ''' function analyses CDP status and adjacency's '''
 
     cdp_entries_count = 0
     cdp_status = True
@@ -75,12 +75,15 @@ def cdp(session):
 
 
 def image(session):
-    ''' Функция собирает и анализарует вывод sh version. Возвращает тип ПО (PE|NPE), модель устройства
-    и имя образа ПО '''
+    ''' The Function analyses software image and type '''
 
     image_type = 'PE'
     device_type = session.send_command('sh version | in bytes of memory').split()[1]
-    device_image = re.search('[\w.-]+bin', session.send_command('sh version | in System image').split()[-1]).group()
+
+    try:
+        device_image = re.search('[\w.-]+bin', session.send_command('sh version | in System image').split()[-1]).group()
+    except Exception() as err:
+        print(f'failed to parse the software image name. Error {err}')
 
     if 'npe' in device_image:
         image_type = 'NPE'
@@ -89,8 +92,8 @@ def image(session):
 
 
 def ntp(session):
-    ''' Функция выполняет предварительную проверку досутпность хоста NTP посредсовм PING. В случае успеха настраивает
-     ntp server и timezone. Возвращает статус синхронизации часов с сервером NTP '''
+    ''' function pre-checks the availability of the NTP host through PING. If successful, sets up
+      ntp server and timezone. Returns the status of clock synchronization with the NTP server '''
 
     ntp_ping_response = session.send_command(f'ping {ntp_server}')
     ntp_sync_status = True
@@ -108,9 +111,9 @@ def ntp(session):
 
 
 def _main():
-    ''' Главная функция, собирает все вместе '''
+    ''' main function, collects everything together '''
 
-    # для простоты адреса устройств подаются на вход скрипта в виде списка через запятую (без пробелов)
+    # for simplicity, device addresses are supplied to the script input as a comma-separated list (without spaces)
     try:
         device_list = sys.argv[1].split(',')
     except IndexError:
@@ -123,23 +126,23 @@ def _main():
     enable_secret = getpass.getpass(prompt='Enter enable password: ')
 
     for ip in device_list:
-        # для каждого устройства из списка устанавливаем соединение
+        # initiate the connection to a device
         sess = connect_to_device(ip, user, password, enable_secret)
         if sess:
 
-            # получаем имя устройства и копируем конфиг
+            # get the hostname and pull the config
             hostname = sh_run(sess)
 
-            # получвем необходимую информацию о CDP
+            # get the required cdp info
             cdp_status, cdp_entries_count = cdp(sess)
 
-            # получаем необходимую информацию об образе ПО
+            # get the required software image info
             image_type, device_type, device_image = image(sess)
 
-            # настраиваем NTP и получаем статус
+            # set up the NTP and analyze its status
             ntp_sync_status = ntp(sess)
 
-            # выводим на экран полученную информацию
+            # print the cumulative output
             print(f'{hostname} | {device_type} | {device_image} | {image_type} | '
                   f'CDP is {cdp_status}, {cdp_entries_count} peers | Clock in {ntp_sync_status}')
 
